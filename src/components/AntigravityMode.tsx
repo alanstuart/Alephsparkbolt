@@ -59,10 +59,10 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         };
 
         const body = Bodies.rectangle(originalPosition.x, originalPosition.y, rect.width, rect.height, {
-          restitution: 0.3,
-          friction: 0.05,
-          frictionAir: 0.08,
-          density: 0.001,
+          restitution: 0.1,
+          friction: 0.1,
+          frictionAir: 0.15,
+          density: 0.0005,
           inertia: Infinity,
         });
 
@@ -72,7 +72,7 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         element.style.zIndex = '1001';
         element.style.transition = 'none';
 
-        const rotationSpeed = (Math.random() - 0.5) * 0.0008;
+        const rotationSpeed = (Math.random() - 0.5) * 0.0003;
 
         physicsElements.push({
           element,
@@ -102,10 +102,10 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
     World.add(engine.world, mouseConstraint);
 
     Events.on(engine, 'beforeUpdate', () => {
-      physicsElements.forEach(({ body }, index) => {
+      physicsElements.forEach(({ body, originalPosition }, index) => {
         Matter.Body.setVelocity(body, {
-          x: body.velocity.x * 0.95,
-          y: body.velocity.y * 0.95,
+          x: body.velocity.x * 0.92,
+          y: body.velocity.y * 0.92,
         });
 
         const mouseX = mouseRef.current.x;
@@ -113,10 +113,10 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         const dx = mouseX - body.position.x;
         const dy = mouseY - body.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        const repulsionRadius = 200;
+        const repulsionRadius = 250;
 
         if (distance < repulsionRadius && distance > 0 && !mouseConstraint.body) {
-          const forceMagnitude = 0.0003 * (1 - distance / repulsionRadius);
+          const forceMagnitude = 0.0005 * (1 - distance / repulsionRadius);
           const forceX = (-dx / distance) * forceMagnitude * body.mass;
           const forceY = (-dy / distance) * forceMagnitude * body.mass;
 
@@ -126,8 +126,8 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
           });
         }
 
-        const margin = 100;
-        const boundaryForce = 0.00015;
+        const margin = 150;
+        const boundaryForce = 0.00008;
 
         if (body.position.x < margin) {
           const pushForce = (margin - body.position.x) / margin * boundaryForce;
@@ -145,16 +145,23 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
           Matter.Body.applyForce(body, body.position, { x: 0, y: -pushForce });
         }
 
+        const isHeroTitle = targetSelectors[index] === '[data-physics="hero-title"]';
+        if (isHeroTitle) {
+          const yDiff = originalPosition.y - body.position.y;
+          const anchorForce = 0.00008;
+          Matter.Body.applyForce(body, body.position, { x: 0, y: yDiff * anchorForce });
+        }
+
         physicsElements.forEach((otherElement, otherIndex) => {
           if (index !== otherIndex) {
             const otherBody = otherElement.body;
             const dx = otherBody.position.x - body.position.x;
             const dy = otherBody.position.y - body.position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            const minDistance = 120;
+            const minDistance = 200;
 
             if (distance < minDistance && distance > 0) {
-              const forceMagnitude = 0.0001 * (1 - distance / minDistance);
+              const forceMagnitude = 0.0003 * (1 - distance / minDistance);
               const forceX = (-dx / distance) * forceMagnitude * body.mass;
               const forceY = (-dy / distance) * forceMagnitude * body.mass;
 
