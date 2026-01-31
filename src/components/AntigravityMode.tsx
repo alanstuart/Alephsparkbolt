@@ -25,26 +25,22 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const handleEngineReady = (engine: Matter.Engine, render: Matter.Render) => {
+  const handleEngineReady = (engine: Matter.Engine, canvas: HTMLCanvasElement) => {
     const { World, Bodies, Mouse, MouseConstraint, Events } = Matter;
 
     const wallThickness = 50;
     const walls = [
       Bodies.rectangle(window.innerWidth / 2, -wallThickness / 2, window.innerWidth, wallThickness, {
         isStatic: true,
-        render: { visible: false },
       }),
       Bodies.rectangle(window.innerWidth / 2, window.innerHeight + wallThickness / 2, window.innerWidth, wallThickness, {
         isStatic: true,
-        render: { visible: false },
       }),
       Bodies.rectangle(-wallThickness / 2, window.innerHeight / 2, wallThickness, window.innerHeight, {
         isStatic: true,
-        render: { visible: false },
       }),
       Bodies.rectangle(window.innerWidth + wallThickness / 2, window.innerHeight / 2, wallThickness, window.innerHeight, {
         isStatic: true,
-        render: { visible: false },
       }),
     ];
 
@@ -83,15 +79,12 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
           friction: 0.001,
           frictionAir: 0.01,
           density: 0.002,
-          render: {
-            visible: false,
-          },
         });
 
         World.add(engine.world, body);
 
         element.style.position = 'fixed';
-        element.style.zIndex = '1000';
+        element.style.zIndex = '1001';
         element.style.transition = 'none';
 
         physicsElements.push({
@@ -105,21 +98,19 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
 
     physicsElementsRef.current = physicsElements;
 
-    const mouse = Mouse.create(render.canvas);
+    const mouse = Mouse.create(canvas);
+    mouse.element.removeEventListener('mousewheel', mouse.mousewheel as any);
+    mouse.element.removeEventListener('DOMMouseScroll', mouse.mousewheel as any);
+
     const mouseConstraint = MouseConstraint.create(engine, {
       mouse: mouse,
       constraint: {
         stiffness: 0.2,
-        render: {
-          visible: false,
-        },
       },
     });
 
     mouseConstraintRef.current = mouseConstraint;
     World.add(engine.world, mouseConstraint);
-
-    render.mouse = mouse;
 
     Events.on(engine, 'beforeUpdate', () => {
       physicsElements.forEach(({ body }) => {
@@ -128,7 +119,7 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         const distance = Math.sqrt(dx * dx + dy * dy);
         const repulsionRadius = 150;
 
-        if (distance < repulsionRadius && distance > 0) {
+        if (distance < repulsionRadius && distance > 0 && !mouseConstraint.body) {
           const forceMagnitude = 0.0005 * (1 - distance / repulsionRadius);
           const forceX = (-dx / distance) * forceMagnitude * body.mass;
           const forceY = (-dy / distance) * forceMagnitude * body.mass;
@@ -152,14 +143,27 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
 
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY };
+      Matter.Mouse.setPosition(mouse, { x: e.clientX, y: e.clientY });
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      Matter.Mouse.setButton(mouse, 0);
+    };
+
+    const handleMouseUp = () => {
+      Matter.Mouse.clearSourceEvents(mouse);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
 
     setIsInitialized(true);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   };
 
@@ -194,10 +198,12 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed top-0 left-0 w-full h-full pointer-events-auto"
+      className="fixed top-0 left-0 w-full h-full"
       style={{
-        zIndex: 999,
-        mixBlendMode: 'normal',
+        zIndex: 1000,
+        pointerEvents: 'none',
+        background: 'transparent',
+        opacity: 0,
       }}
     />
   );
