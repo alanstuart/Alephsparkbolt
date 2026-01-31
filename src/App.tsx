@@ -9,11 +9,14 @@ import Footer from './components/Footer';
 import ToggleDemo from './components/ToggleDemo';
 import TechBackground from './components/TechBackground';
 import ErrorFallback from './components/ErrorFallback';
+import AntigravityMode from './components/AntigravityMode';
+import AntigravityToggle from './components/AntigravityToggle';
 import './styles/tech-theme.css';
 import './styles/toggle-demo.css';
 
 const App: React.FC = () => {
   const [showBackground, setShowBackground] = useState(false);
+  const [isAntigravityActive, setIsAntigravityActive] = useState(false);
 
   useEffect(() => {
     document.title = "AlephSpark | Modern Web Development Solutions";
@@ -23,6 +26,10 @@ const App: React.FC = () => {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleToggleAntigravity = () => {
+    setIsAntigravityActive(!isAntigravityActive);
+  };
 
   return (
     <div className="font-inter text-white min-h-screen overflow-x-hidden relative" style={{ background: 'var(--primary-bg)' }}>
@@ -45,6 +52,8 @@ const App: React.FC = () => {
         </main>
         <Footer />
       </div>
+      <AntigravityMode isActive={isAntigravityActive} />
+      <AntigravityToggle isActive={isAntigravityActive} onToggle={handleToggleAntigravity} />
     </div>
   );
 };
