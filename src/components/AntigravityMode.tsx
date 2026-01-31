@@ -12,6 +12,8 @@ interface PhysicsElement {
     transition: string;
     zIndex: string;
   };
+  rotationSpeed: number;
+  continuousRotation: number;
 }
 
 interface AntigravityModeProps {
@@ -27,24 +29,6 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
 
   const handleEngineReady = (engine: Matter.Engine, canvas: HTMLCanvasElement) => {
     const { World, Bodies, Mouse, MouseConstraint, Events } = Matter;
-
-    const wallThickness = 50;
-    const walls = [
-      Bodies.rectangle(window.innerWidth / 2, -wallThickness / 2, window.innerWidth, wallThickness, {
-        isStatic: true,
-      }),
-      Bodies.rectangle(window.innerWidth / 2, window.innerHeight + wallThickness / 2, window.innerWidth, wallThickness, {
-        isStatic: true,
-      }),
-      Bodies.rectangle(-wallThickness / 2, window.innerHeight / 2, wallThickness, window.innerHeight, {
-        isStatic: true,
-      }),
-      Bodies.rectangle(window.innerWidth + wallThickness / 2, window.innerHeight / 2, wallThickness, window.innerHeight, {
-        isStatic: true,
-      }),
-    ];
-
-    World.add(engine.world, walls);
 
     const targetSelectors = [
       '[data-physics="hero-title"]',
@@ -75,10 +59,11 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         };
 
         const body = Bodies.rectangle(originalPosition.x, originalPosition.y, rect.width, rect.height, {
-          restitution: 0.8,
-          friction: 0.001,
-          frictionAir: 0.01,
-          density: 0.002,
+          restitution: 0.3,
+          friction: 0.05,
+          frictionAir: 0.08,
+          density: 0.001,
+          inertia: Infinity,
         });
 
         World.add(engine.world, body);
@@ -87,11 +72,15 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
         element.style.zIndex = '1001';
         element.style.transition = 'none';
 
+        const rotationSpeed = (Math.random() - 0.5) * 0.0008;
+
         physicsElements.push({
           element,
           body,
           originalPosition,
           originalStyles,
+          rotationSpeed,
+          continuousRotation: 0,
         });
       }
     });
@@ -113,14 +102,21 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
     World.add(engine.world, mouseConstraint);
 
     Events.on(engine, 'beforeUpdate', () => {
-      physicsElements.forEach(({ body }) => {
-        const dx = mouseRef.current.x - body.position.x;
-        const dy = mouseRef.current.y - body.position.y;
+      physicsElements.forEach(({ body }, index) => {
+        Matter.Body.setVelocity(body, {
+          x: body.velocity.x * 0.95,
+          y: body.velocity.y * 0.95,
+        });
+
+        const mouseX = mouseRef.current.x;
+        const mouseY = mouseRef.current.y;
+        const dx = mouseX - body.position.x;
+        const dy = mouseY - body.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        const repulsionRadius = 150;
+        const repulsionRadius = 200;
 
         if (distance < repulsionRadius && distance > 0 && !mouseConstraint.body) {
-          const forceMagnitude = 0.0005 * (1 - distance / repulsionRadius);
+          const forceMagnitude = 0.0003 * (1 - distance / repulsionRadius);
           const forceX = (-dx / distance) * forceMagnitude * body.mass;
           const forceY = (-dy / distance) * forceMagnitude * body.mass;
 
@@ -129,15 +125,60 @@ const AntigravityMode: React.FC<AntigravityModeProps> = ({ isActive }) => {
             y: forceY,
           });
         }
+
+        const margin = 100;
+        const boundaryForce = 0.00015;
+
+        if (body.position.x < margin) {
+          const pushForce = (margin - body.position.x) / margin * boundaryForce;
+          Matter.Body.applyForce(body, body.position, { x: pushForce, y: 0 });
+        } else if (body.position.x > window.innerWidth - margin) {
+          const pushForce = (body.position.x - (window.innerWidth - margin)) / margin * boundaryForce;
+          Matter.Body.applyForce(body, body.position, { x: -pushForce, y: 0 });
+        }
+
+        if (body.position.y < margin) {
+          const pushForce = (margin - body.position.y) / margin * boundaryForce;
+          Matter.Body.applyForce(body, body.position, { x: 0, y: pushForce });
+        } else if (body.position.y > window.innerHeight - margin) {
+          const pushForce = (body.position.y - (window.innerHeight - margin)) / margin * boundaryForce;
+          Matter.Body.applyForce(body, body.position, { x: 0, y: -pushForce });
+        }
+
+        physicsElements.forEach((otherElement, otherIndex) => {
+          if (index !== otherIndex) {
+            const otherBody = otherElement.body;
+            const dx = otherBody.position.x - body.position.x;
+            const dy = otherBody.position.y - body.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = 120;
+
+            if (distance < minDistance && distance > 0) {
+              const forceMagnitude = 0.0001 * (1 - distance / minDistance);
+              const forceX = (-dx / distance) * forceMagnitude * body.mass;
+              const forceY = (-dy / distance) * forceMagnitude * body.mass;
+
+              Matter.Body.applyForce(body, body.position, {
+                x: forceX,
+                y: forceY,
+              });
+            }
+          }
+        });
       });
     });
 
     Events.on(engine, 'afterUpdate', () => {
-      physicsElements.forEach(({ element, body }) => {
-        const angle = body.angle;
+      physicsElements.forEach((physicsElement) => {
+        const { element, body, rotationSpeed } = physicsElement;
+
+        physicsElement.continuousRotation += rotationSpeed;
+
+        const totalRotation = body.angle + physicsElement.continuousRotation;
+
         element.style.transform = `translate(${body.position.x - element.offsetWidth / 2}px, ${
           body.position.y - element.offsetHeight / 2
-        }px) rotate(${angle}rad)`;
+        }px) rotate(${totalRotation}rad)`;
       });
     });
 
